@@ -1,0 +1,152 @@
+# Maven
+# Build your Java project and run tests with Apache Maven.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/java
+
+trigger:
+- none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+    - stage: Build
+      jobs:
+          - job: 'j1'
+            steps:
+            - task: ServiceNow-DevOps-Agent-Job-Notification@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                Phase: 'STARTED'
+            - task: Bash@3
+              inputs:
+                targetType: 'inline'
+                script: |
+                  # Write your commands here
+                  
+                  echo 'Hello world'
+            - task: ServiceNow-DevOps-Agent-Job-Notification@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                Phase: 'COMPLETED'
+    - stage: Test
+      jobs:
+          - job: 'j2'
+            steps:
+            - task: ServiceNow-DevOps-Agent-Job-Notification@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                upstream: 'j1'
+                Phase: 'STARTED'
+            - task: Maven@3
+              inputs:
+                mavenPomFile: 'pom.xml'
+                mavenOptions: '-Xmx3072m'
+                javaHomeOption: 'JDKVersion'
+                jdkVersionOption: '1.8'
+                jdkArchitectureOption: 'x64'
+                publishJUnitResults: true
+                testResultsFiles: '**/surefire-reports/TEST-*.xml'
+                goals: 'test'
+                testRunTitle: 'j2'
+            - task: ServiceNow-DevOps-Agent-Job-Notification@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                upstream: 'j1'
+                Phase: 'COMPLETED'
+    - stage: publishArtifact
+      jobs:
+          - job: 'j3'
+            pool: server
+            steps:
+            - task: ServiceNow-DevOps-Server-Job-Notification@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                UpstreamJob: 'j2'
+                Phase: 'STARTED'
+            - task: ServiceNow-DevOps-Server-Artifact-Registration@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                artifactRegistrationPayload: |
+                  {
+                     "artifacts": [
+                        {
+                           "name": "az-artifact1",
+                           "version": "1.$(build.buildId)",
+                           "semanticVersion": "1.$(build.buildId).0",
+                           "repositoryName": "repo1"
+                        },
+                        {
+                           "name": "az-artifact2",
+                           "version": "1.$(build.buildId)",
+                           "semanticVersion": "1.$(build.buildId).0",
+                           "repositoryName": "repo2"
+                        }
+                     ],
+                     "pipelineName": "$(system.teamProject)/$(build.definitionName)",
+                     "taskExecutionNumber": "$(build.buildId)",
+                     "stageName": "$(System.StageName)/$(system.jobDisplayName)",
+                     "branchName": "$(build.sourceBranchName)"
+                  }
+                artifactToolIdExists: false
+            - task: ServiceNow-DevOps-Server-Job-Notification@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                UpstreamJob: 'j2'
+                Phase: 'COMPLETED'
+    - stage: publishPackage
+      jobs:
+          - job: 'j4'
+            pool: server
+            steps:
+            - task: ServiceNow-DevOps-Server-Job-Notification@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                UpstreamJob: 'j3'
+                Phase: 'STARTED'
+            - task: ServiceNow-DevOps-Server-Package-Registration@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                packageRegistrationPayload: |
+                  {
+                      "name": "pkg$(build.buildId)",
+                      "artifacts": [
+                      {
+                          "name": "az-artifact1",
+                          "repositoryName": "repo1",
+                          "version": "1.$(build.buildId)",
+                          "pipelineName":"$(system.teamProject)/$(build.definitionName)",
+                          "taskExecutionNumber":"$(build.buildId)",
+                          "stageName":"$(System.StageName)/$(system.jobDisplayName)",
+                          "branchName":"$(build.sourceBranchName)"
+                      }],
+                      "pipelineName":"$(system.teamProject)/$(build.definitionName)",
+                      "taskExecutionNumber":"$(build.buildId)",
+                      "stageName":"$(System.StageName)/$(system.jobDisplayName)",
+                      "branchName":"$(build.sourceBranchName)"
+                  }
+                artifactToolIdExists: false
+            - task: ServiceNow-DevOps-Server-Job-Notification@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                UpstreamJob: 'j3'
+                Phase: 'COMPLETED'
+    - stage: deploy
+      jobs:
+          - job: 'j5'
+            pool: server
+            steps:
+            - task: ServiceNow-DevOps-Server-Job-Notification@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                UpstreamJob: 'j4'
+                Phase: 'STARTED'
+            - task: ServiceNow-DevOps-Server-Change-Acceleration@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                UpstreamJob: 'j4'
+            - task: ServiceNow-DevOps-Server-Job-Notification@1
+              inputs:
+                connectedServiceName: 'empbkaranam11-DevOps Automation Project-ServiceNow DevOps Service Connection'
+                UpstreamJob: 'j4'
+                Phase: 'COMPLETED'
